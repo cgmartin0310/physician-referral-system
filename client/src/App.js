@@ -1,26 +1,22 @@
-import logo from './logo.svg';
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import PhysiciansTable from './components/PhysiciansTable';
+import ReferralsTable from './components/ReferralsTable';
+import Layout from './components/Layout';
 import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app-container">
+      <Layout>
+        <Routes>
+          <Route path="/physicians" element={<PhysiciansTable />} />
+          <Route path="/referrals" element={<ReferralsTable />} />
+          <Route path="/" element={<PhysiciansTable />} />
+        </Routes>
+      </Layout>
     </div>
   );
 }
 
 export default App;
-// Deployment timestamp: Sun Apr 13 09:43:19 EDT 2025
