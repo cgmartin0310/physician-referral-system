@@ -1,93 +1,92 @@
-require('dotenv').config();
-const { Pool } = require('pg');
-const express = require('express');
-const app = express();
-const port = process.env.PORT || 3000;
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-// PostgreSQL Configuration (unchanged)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/yourdb',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+function ReferralsTable() {
+  const [referrals, setReferrals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-// Test DB connection (unchanged)
-(async () => {
-  try {
-    await pool.query('SELECT NOW()');
-    console.log('🚀 PostgreSQL connected');
-  } catch (err) {
-    console.error('❌ PostgreSQL connection error:', err.stack);
-    process.exit(1);
-  }
-})();
+  useEffect(() => {
+    const fetchReferrals = async () => {
+      try {
+        const response = await fetch('/api/referrals', {
+          headers: {
+            'Content-Type': 'application/json',
+            // Include auth token if needed:
+            // 'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
 
-// Middleware (unchanged)
-app.use(express.json());
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-// ========================
-// NEW: Add CORS support
-// ========================
-const cors = require('cors');
-app.use(cors());
+        const data = await response.json();
+        setReferrals(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-// ========================
-// NEW: Referral Listing Endpoint 
-// (Matches your exact schema)
-// ========================
-app.get('/api/referrals', async (req, res) => {
-  try {
-    const { rows } = await pool.query(`
-      SELECT 
-        r.id,
-        r.patient_name,
-        r.patient_dob,
-        r.patient_phone,
-        r.referral_date,
-        r.status,
-        r.therapy_type,
-        r.clinic_location,
-        r.notes,
-        p.full_name AS physician_name,
-        p.specialty AS physician_specialty
-      FROM referrals r
-      JOIN physicians p ON r.physician_id = p.id
-      ORDER BY r.referral_date DESC
-    `);
-    res.json(rows);
-  } catch (err) {
-    console.error('❌ Referral fetch error:', err);
-    res.status(500).json({ 
-      error: 'Failed to fetch referrals',
-      details: err.message 
-    });
-  }
-});
+    fetchReferrals();
+  }, []);
 
-// Existing health check (unchanged)
-app.get('/api/health', async (req, res) => {
-  /* ... existing code ... */
-});
+  if (loading) return <div className="loading-spinner">Loading...</div>;
+  if (error) return <div className="error-alert">Error: {error}</div>;
 
-// Existing POST endpoint (unchanged)
-app.post('/api/referrals', async (req, res) => {
-  /* ... existing code ... */
-});
+  return (
+    <div className="table-responsive">
+      <table className="referral-table">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Referring MD</th>
+            <th>Referred To</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {referrals.length > 0 ? (
+            referrals.map((referral) => (
+              <tr key={`${referral.id}-${referral.date}`}>
+                <td>{referral.patientName}</td>
+                <td>{referral.referringPhysician}</td>
+                <td>{referral.referredTo}</td>
+                <td>{new Date(referral.date).toLocaleDateString()}</td>
+                <td>
+                  <span className={`status-badge ${referral.status.toLowerCase()}`}>
+                    {referral.status}
+                  </span>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="5" className="no-referrals">
+                No referrals found
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-// Error Handling (unchanged)
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Something broke!');
-});
+ReferralsTable.propTypes = {
+  referrals: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      patientName: PropTypes.string.isRequired,
+      referringPhysician: PropTypes.string.isRequired,
+      referredTo: PropTypes.string.isRequired,
+      date: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]).isRequired,
+      status: PropTypes.oneOf(['Pending', 'Completed', 'Cancelled']).isRequired,
+    })
+  ),
+};
 
-// Start Server (unchanged)
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
-
-// Graceful shutdown (unchanged)
-process.on('SIGTERM', () => {
-  pool.end(() => {
-    console.log('PostgreSQL pool closed');
-    process.exit(0);
-  });
-});
+export default ReferralsTable;

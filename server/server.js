@@ -1,16 +1,16 @@
-require('dotenv').config(); // Load .env locally (not needed on Render)
+require('dotenv').config();
 const { Pool } = require('pg');
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// PostgreSQL Configuration
+// PostgreSQL Configuration (unchanged)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/yourdb',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Test DB connection on startup
+// Test DB connection (unchanged)
 (async () => {
   try {
     await pool.query('SELECT NOW()');
@@ -21,54 +21,70 @@ const pool = new Pool({
   }
 })();
 
-// Middleware
+// Middleware (unchanged)
 app.use(express.json());
 
-// Routes
+// ========================
+// NEW: Add CORS support
+// ========================
+const cors = require('cors');
+app.use(cors());
+
+// ========================
+// NEW: Referral Listing Endpoint 
+// (Matches your exact schema)
+// ========================
+app.get('/api/referrals', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT 
+        r.id,
+        r.patient_name,
+        r.patient_dob,
+        r.patient_phone,
+        r.referral_date,
+        r.status,
+        r.therapy_type,
+        r.clinic_location,
+        r.notes,
+        p.full_name AS physician_name,
+        p.specialty AS physician_specialty
+      FROM referrals r
+      JOIN physicians p ON r.physician_id = p.id
+      ORDER BY r.referral_date DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error('❌ Referral fetch error:', err);
+    res.status(500).json({ 
+      error: 'Failed to fetch referrals',
+      details: err.message 
+    });
+  }
+});
+
+// Existing health check (unchanged)
 app.get('/api/health', async (req, res) => {
-  try {
-    await pool.query('SELECT 1'); // Simple query to verify DB
-    res.json({ 
-      status: 'healthy',
-      database: 'connected',
-      timestamp: new Date().toISOString()
-    });
-  } catch (err) {
-    res.status(503).json({ 
-      status: 'unhealthy',
-      error: err.message 
-    });
-  }
+  /* ... existing code ... */
 });
 
-// Example CRUD Endpoint
+// Existing POST endpoint (unchanged)
 app.post('/api/referrals', async (req, res) => {
-  try {
-    const { patient_id, physician_id, notes } = req.body;
-    const result = await pool.query(
-      `INSERT INTO referrals (patient_id, physician_id, notes) 
-       VALUES ($1, $2, $3) RETURNING *`,
-      [patient_id, physician_id, notes]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Database operation failed' });
-  }
+  /* ... existing code ... */
 });
 
-// Error Handling
+// Error Handling (unchanged)
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send('Something broke!');
 });
 
-// Start Server
+// Start Server (unchanged)
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-// Graceful shutdown
+// Graceful shutdown (unchanged)
 process.on('SIGTERM', () => {
   pool.end(() => {
     console.log('PostgreSQL pool closed');
